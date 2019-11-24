@@ -1,0 +1,27 @@
+<?php
+
+namespace App\Command;
+
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+
+class DaemonCommand extends Command
+{
+  protected static $defaultName = 'binance:daemon';
+
+  protected function configure()
+  {
+    $this->setName('binance:daemon')
+      ->setDescription('Run daemon')
+      ->setHelp('This command starts binance-parser daemon');
+  }
+
+  protected function execute(InputInterface $input, OutputInterface $output)
+  {
+    $now = date('c');
+    $message = sprintf("Current date and time: %s", $now);
+
+    $output->writeln($message);
+  }
+}
