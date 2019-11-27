@@ -65,7 +65,10 @@ class ReportParserCommand extends Command
     do {
       $total = '';
       $pair = '';
-      $ret = $this->readBlock($workSheet, $index, $pair, $total);
+      $firstDate = null;
+      $ret = $this->readBlock($workSheet, $index, $pair, $total, $firstDate);
+      $firstDateTime = new \DateTime();
+      $firstDateTime->setTimestamp(strtotime($firstDate));
       $total = floatval(str_replace(['₮', '$'], '', $total)) * 100;
       if ($total > 0) {
         $sumP += $total;
@@ -86,15 +89,20 @@ class ReportParserCommand extends Command
 
         // --
 
-        $repo = $this->em->getRepository('App:Order');
-        $newOrder = new Order();
-        $newOrder->init($pairObj->getId(), $total);
-        $this->em->persist($newOrder);
-        $this->em->flush();
-      }
+        $repoOrder = $this->em->getRepository('App:Order');
+        $orderObj = $repoOrder->findOneBy(['firstDate' => $firstDateTime]);
+        if (!$orderObj) {
+          $newOrder = new Order();
+          $newOrder->init($pairObj->getId(), $total, $firstDateTime);
+          $this->em->persist($newOrder);
+          $this->em->flush();
+        }
 
+        // --
+
+        $repoOrderAction = $this->em->getRepository('App:OrderAction');
+      }
     } while (!empty($ret));
-    var_dump($sumP, $sumN);
   }
 
   /**
@@ -102,10 +110,11 @@ class ReportParserCommand extends Command
    * @param int $index
    * @param string $pair
    * @param string $total
+   * @param string $firstDate
    * @return array|null
    * @throws \PhpOffice\PhpSpreadsheet\Exception
    */
-  private function readBlock(Worksheet $workSheet, int &$index, string &$pair, string &$total)
+  private function readBlock(Worksheet $workSheet, int &$index, string &$pair, string &$total, string &$firstDate = null)
   {
     $ret = [];
     do {
@@ -122,6 +131,9 @@ class ReportParserCommand extends Command
         'amount' => $workSheet->getCell('E'.($index-1))->getValue(),
         'date' => $workSheet->getCell('F'.($index-1))->getValue(),
       ];
+      if ($firstDate === null) {
+        $firstDate = $workSheet->getCell('F'.($index-1))->getValue();
+      }
       $pair = $value;
       $total = $workSheet->getCell('G'.($index-1))->getValue();
     } while (true);
