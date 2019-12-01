@@ -24,7 +24,7 @@ class OrderAction
     /**
      * @var int
      *
-     * @ORM\Column(name="index", type="integer", nullable=false, options={"unsigned"=true})
+     * @ORM\Column(name="order_index", type="integer", nullable=false, options={"unsigned"=true})
      * @ORM\Id
      * @ORM\GeneratedValue(strategy="NONE")
      */
@@ -63,7 +63,32 @@ class OrderAction
      *
      * @ORM\Column(name="time", type="datetime", nullable=true, options={"default"="NULL"})
      */
-    private $time = 'NULL';
+    private $time = NULL;
 
 
+  /**
+   * @param int $orderId
+   * @param int $index
+   * @param bool $isBuy
+   * @param string $quantity
+   * @param int $price
+   * @param int $amount
+   * @param \DateTime $time
+   */
+    public function init(int $orderId, int $index, bool $isBuy, string $quantity, int $price, int $amount, \DateTime $time) {
+      $this->orderId = $orderId;
+      $this->index = $index;
+      $this->actionBuy = $isBuy;
+      $this->quantity = $quantity;
+      $this->price = $price;
+      $this->amount = $amount;
+      $this->time = $time;
+    }
+
+  /**
+   * @return int
+   */
+    public function getIndex(): int {
+      return $this->index;
+    }
 }

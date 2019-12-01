@@ -101,4 +101,11 @@ class Order
     $this->result = $result;
     $this->firstDate = $firstDateTime;
   }
+
+  /**
+   * @return int
+   */
+  public function getId(): int {
+    return $this->orderId;
+  }
 }

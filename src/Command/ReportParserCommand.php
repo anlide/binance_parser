@@ -3,6 +3,7 @@
 namespace App\Command;
 
 use App\Entity\Order;
+use App\Entity\OrderAction;
 use App\Entity\Pair;
 use Doctrine\ORM\EntityManagerInterface;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
@@ -37,6 +38,9 @@ class ReportParserCommand extends Command
       if (in_array($file, ['.', '..'])) {
         continue;
       }
+      if (is_dir($this->path.'/'.$file)) {
+        continue;
+      }
       try {
         $this->parseReport($file);
         var_dump('----------------');
@@ -58,7 +62,16 @@ class ReportParserCommand extends Command
     $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader("Xls");
     $reader->setReadDataOnly(true);
     $spreadSheet = $reader->load($this->path.'/'.$file);
-    $workSheet = $spreadSheet->getActiveSheet();
+    foreach ($spreadSheet->getAllSheets() as $workSheet) {
+      $this->parseSheet($workSheet);
+    }
+  }
+
+  /**
+   * @param Worksheet $workSheet
+   * @throws \PhpOffice\PhpSpreadsheet\Exception
+   */
+  private function parseSheet(Worksheet $workSheet): void {
     $index = 2;
     $sumP = 0;
     $sumN = 0;
@@ -67,9 +80,12 @@ class ReportParserCommand extends Command
       $pair = '';
       $firstDate = null;
       $ret = $this->readBlock($workSheet, $index, $pair, $total, $firstDate);
+      if ($total === null) {
+        continue;
+      }
       $firstDateTime = new \DateTime();
       $firstDateTime->setTimestamp(strtotime($firstDate));
-      $total = floatval(str_replace(['₮', '$'], '', $total)) * 100;
+      $total = $this->getPriceValue($total);
       if ($total > 0) {
         $sumP += $total;
       } else {
@@ -92,15 +108,36 @@ class ReportParserCommand extends Command
         $repoOrder = $this->em->getRepository('App:Order');
         $orderObj = $repoOrder->findOneBy(['firstDate' => $firstDateTime]);
         if (!$orderObj) {
-          $newOrder = new Order();
-          $newOrder->init($pairObj->getId(), $total, $firstDateTime);
-          $this->em->persist($newOrder);
+          $orderObj = new Order();
+          $orderObj->init($pairObj->getId(), $total, $firstDateTime);
+          $this->em->persist($orderObj);
           $this->em->flush();
         }
 
         // --
 
         $repoOrderAction = $this->em->getRepository('App:OrderAction');
+
+        foreach ($ret as $actionRow) {
+          $orderActionDateTime = new \DateTime();
+          $orderActionDateTime->setTimestamp(strtotime($actionRow['date']));
+
+          $orderActionObj = $repoOrderAction->findOneBy(['orderId' => $orderObj->getId(), 'time' => $orderActionDateTime]);
+          if (!$orderActionObj) {
+            $orderActionObj = new OrderAction();
+            $orderActionObj->init(
+              $orderObj->getId(),
+              $this->getIndex($orderObj->getId()),
+              $actionRow['action'] == 'Bought',
+              $actionRow['quantity'],
+              $this->getPriceValue($actionRow['price']),
+              $this->getPriceValue($actionRow['amount']),
+              $orderActionDateTime
+            );
+            $this->em->persist($orderActionObj);
+            $this->em->flush();
+          }
+        }
       }
     } while (!empty($ret));
   }
@@ -139,5 +176,35 @@ class ReportParserCommand extends Command
     } while (true);
 
     return $ret;
+  }
+
+  /**
+   * @param int $orderId
+   * @return int
+   */
+  private function getIndex(int $orderId): int {
+    $repoOrderAction = $this->em->getRepository('App:OrderAction');
+
+    $orderActionObjects = $repoOrderAction->findBy(['orderId' => $orderId]);
+
+    $maxIndex = null;
+
+    foreach ($orderActionObjects as $orderActionObject) {
+      if ($maxIndex === null) {
+        $maxIndex = $orderActionObject->getIndex();
+      } elseif ($maxIndex < $orderActionObject->getIndex()) {
+        $maxIndex = $orderActionObject->getIndex();
+      }
+    }
+
+    return $maxIndex === null ? 0 : ($maxIndex + 1);
+  }
+
+  /**
+   * @param string $value
+   * @return int
+   */
+  private function getPriceValue(string $value): int {
+    return intval(floatval(str_replace(['₮', '$'], '', $value)) * 100);
   }
 }
