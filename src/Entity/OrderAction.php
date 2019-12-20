@@ -66,29 +66,29 @@ class OrderAction
     private $time = NULL;
 
 
-  /**
-   * @param int $orderId
-   * @param int $index
-   * @param bool $isBuy
-   * @param string $quantity
-   * @param int $price
-   * @param int $amount
-   * @param \DateTime $time
-   */
+    /**
+     * @param int $orderId
+     * @param int $index
+     * @param bool $isBuy
+     * @param string $quantity
+     * @param int $price
+     * @param int $amount
+     * @param \DateTime $time
+     */
     public function init(int $orderId, int $index, bool $isBuy, string $quantity, int $price, int $amount, \DateTime $time) {
-      $this->orderId = $orderId;
-      $this->index = $index;
-      $this->actionBuy = $isBuy;
-      $this->quantity = $quantity;
-      $this->price = $price;
-      $this->amount = $amount;
-      $this->time = $time;
+        $this->orderId = $orderId;
+        $this->index = $index;
+        $this->actionBuy = $isBuy;
+        $this->quantity = $quantity;
+        $this->price = $price;
+        $this->amount = $amount;
+        $this->time = $time;
     }
 
-  /**
-   * @return int
-   */
+    /**
+     * @return int
+     */
     public function getIndex(): int {
-      return $this->index;
+        return $this->index;
     }
 }

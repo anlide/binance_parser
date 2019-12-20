@@ -28,11 +28,11 @@ class Pair
      */
     private $name;
 
-  public function init(string $name) {
-    $this->name = $name;
-  }
+    public function init(string $name) {
+        $this->name = $name;
+    }
 
-  public function getId() {
-    return $this->pairId;
-  }
+    public function getId() {
+        return $this->pairId;
+    }
 }
