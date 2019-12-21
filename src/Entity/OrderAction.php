@@ -38,9 +38,9 @@ class OrderAction
     private $actionBuy;
 
     /**
-     * @var float
+     * @var string
      *
-     * @ORM\Column(name="quantity", type="float", precision=10, scale=0, nullable=false)
+     * @ORM\Column(name="quantity", type="string", length=255, nullable=false)
      */
     private $quantity;
 

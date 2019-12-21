@@ -2,18 +2,20 @@
 
 namespace App\Command;
 
+use App\Entity\Price;
 use Larislackers\BinanceApi\BinanceApiContainer;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 class DaemonCommand extends Command
 {
-    const LIMIT_EACH_5000 = 60 * 20;
-    const LIMIT_EACH_1000 = 60 * 5;
+    const LIMIT_EACH_5000 = 60 * 30;
+    const LIMIT_EACH_1000 = 60 * 10;
     const LIMIT_EACH_500 = 60;
     const LIMIT_EACH_100 = 1;
-    const SLEEP_MICROTIME = 76923;
+    const SLEEP_MICROTIME = 76923; // NOTE: 1000000 / 13
     const SATOSHY_FACTOR = 100000000;
 
     protected static $defaultName = 'binance:daemon';
@@ -25,6 +27,14 @@ class DaemonCommand extends Command
      * @var BinanceApiContainer
      */
     protected $bac;
+
+    private $container;
+
+    public function __construct(ContainerInterface $container)
+    {
+        parent::__construct();
+        $this->container = $container;
+    }
 
     protected function configure()
     {
@@ -44,10 +54,6 @@ class DaemonCommand extends Command
         $lastRequest = time();
 
         do {
-            // NOTE: limit 5000 - each 20 minutes
-            // NOTE: limit 1000 - each 5 minutes
-            // NOTE: limit 500 - each minute
-            // NOTE: limit 100 - each second
             $time = time();
             if ($lastRequest < $time) {
                 $this->step($time);
@@ -75,7 +81,9 @@ class DaemonCommand extends Command
         }
 
         list($lastUpdateId, $prices) = $this->getPrices($limit);
-        $this->storePrices($lastUpdateId, $prices);
+        if (100 !== $limit) {
+            $this->storePrices($lastUpdateId, $time, $prices);
+        }
         $this->processAnalytic($lastUpdateId, $prices);
         $this->webSocketBroadcast($prices);
     }
@@ -97,18 +105,12 @@ class DaemonCommand extends Command
         foreach ($asks as $ask) {
             $price = intval(floatval($ask[0]) * 100);
             $amount = intval(floatval($ask[1]) * self::SATOSHY_FACTOR);
-            $prices[] = [
-                'price' => $price,
-                'amount' => $amount,
-            ];
+            $prices[$price] = $amount;
         }
         foreach ($bids as $bid) {
             $price = intval(floatval($bid[0]) * 100);
             $amount = intval(floatval($bid[1]) * self::SATOSHY_FACTOR);
-            $prices[] = [
-                'price' => $price,
-                'amount' => $amount,
-            ];
+            $prices[$price] = $amount;
         }
 
         return [$lastUpdateId, $prices];
@@ -116,11 +118,29 @@ class DaemonCommand extends Command
 
     /**
      * @param int $lastUpdateId
+     * @param int $timestamp
      * @param array $prices
      */
-    protected function storePrices(int $lastUpdateId, array $prices)
+    protected function storePrices(int $lastUpdateId, int $timestamp, array $prices)
     {
-        // TODO: Store the data to the database
+        /** @var \Doctrine\ORM\EntityManager $em */
+        $em = $this->container->get('doctrine')->getManager();
+
+        try {
+            foreach ($prices as $price => $amount) {
+                $priceObj = new Price();
+                $priceObj->init($timestamp, $price, $amount);
+                $em->persist($priceObj);
+            }
+            $em->flush(); //Persist objects that did not make up an entire batch
+            $em->clear();
+        } catch (\Doctrine\Common\Persistence\Mapping\MappingException $exception) {
+            error_log('Stop saving: '.$exception->getMessage());
+            exit;
+        } catch (\Doctrine\ORM\ORMException $exception) {
+            error_log('Stop saving: '.$exception->getMessage());
+            exit;
+        }
     }
 
     /**
@@ -158,14 +178,14 @@ class DaemonCommand extends Command
     protected function groupPrices(int $factor, array $prices)
     {
         $newPrices = [];
-        foreach ($prices as $item) {
+        foreach ($prices as $price => $amount) {
             // NOTE: it is critical to use "floor" function to round prices
-            $price = intval(floor($item['price'] / $factor));
+            $price = intval(floor($price / $factor));
             if (!isset($newPrices[$price])) {
                 $newPrices[$price] = 0;
             }
 
-            $newPrices[$price] += $item['amount'];
+            $newPrices[$price] += $amount;
         }
 
         return $newPrices;
