@@ -85,9 +85,9 @@ class DaemonCommand extends Command
             return;
         }
         list($lastUpdateId, $prices) = $this->getPrices($limit);
-        if (100 !== $limit) {
+        //if (100 !== $limit) {
             $this->storePrices($lastUpdateId, $time, $prices);
-        }
+        //}
         $this->processAnalytic($lastUpdateId, $prices);
         $this->webSocketBroadcast($prices);
     }
