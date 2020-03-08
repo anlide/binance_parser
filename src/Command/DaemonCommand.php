@@ -80,14 +80,8 @@ class DaemonCommand extends Command
             $limit = 5000;
         }
 
-        if (100 === $limit) {
-            // TODO: Remove this restriction
-            return;
-        }
         list($lastUpdateId, $prices) = $this->getPrices($limit);
-        //if (100 !== $limit) {
-            $this->storePrices($lastUpdateId, $time, $prices);
-        //}
+        $this->storePrices($lastUpdateId, $time, $prices);
         $this->processAnalytic($lastUpdateId, $prices);
         $this->webSocketBroadcast($prices);
     }
